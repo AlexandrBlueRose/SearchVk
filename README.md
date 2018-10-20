@@ -1,2 +1,2 @@
 # SearchVk
-Seample search people on social network vk. 
+Simple search people on social network vk. 
