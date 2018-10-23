@@ -1,0 +1,8 @@
+{
+  "prettier.eslintIntegration": false,
+  "window.zoomLevel": 1,
+  "editor.tabSize": 2,
+  "editor.formatOnSave": true,
+  "editor.minimap.enabled": false,
+  "npm.enableScriptExplorer": true
+}

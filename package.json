@@ -15,5 +15,13 @@
   "bugs": {
     "url": "https://github.com/AlexandrBlueRose/SearchVk/issues"
   },
-  "homepage": "https://github.com/AlexandrBlueRose/SearchVk#readme"
+  "homepage": "https://github.com/AlexandrBlueRose/SearchVk#readme",
+  "devDependencies": {
+    "eslint": "^5.7.0",
+    "eslint-config-airbnb": "^17.1.0",
+    "eslint-plugin-import": "^2.14.0"
+  },
+  "dependencies": {
+    "extract-zip": "^1.6.7"
+  }
 }
