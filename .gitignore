@@ -61,6 +61,7 @@ bower_components
 # IDE - VSCode
 
 .vscode/*
+vscode/
 
 !.vscode/settings.json
 
