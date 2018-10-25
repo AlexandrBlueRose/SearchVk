@@ -2,7 +2,8 @@
 //браузером
 const puppeteer = require("puppeteer");
 
-("use struct");
+//подключаем свой модуль для обработки и сбора информации со страниц
+const scraping = require("./engine/scraping.js");
 
 //создаем константу вызова функции которая имеет ссылку на функцию
 const scrape = async function() {
@@ -28,6 +29,11 @@ const scrape = async function() {
 
   //ожидаем 2 секунды(для прогрузки страницы)
   await page.waitFor(2000);
+
+  //переход на страницу друзей
+  await page.goto("https://vk.com/friends");
+
+  await page.evaluate();
 
   //закрываем браузер
   await browser.close();
