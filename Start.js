@@ -4,7 +4,7 @@ const puppeteer = require("puppeteer");
 
 //подключаем свой модуль для обработки и сбора информации со страниц
 const scraping = require("./engine/scraping.js");
-
+//
 //создаем константу вызова функции которая имеет ссылку на функцию
 const scrape = async function() {
   //запуск браузера и запись в переменную ссылки на него ,
