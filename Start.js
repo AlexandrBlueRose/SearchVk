@@ -19,10 +19,10 @@ const scrape = async function() {
   await page.goto("https://vk.com/id271572369");
 
   //берем селектор строки ввода на сайте и заполняем следующим параметром
-  await page.type("#quick_email", "+79859766033");
+  await page.type("#quick_email", "login");
 
   //аналогично ,но для селектора пароля
-  await page.type("#quick_pass", "fantihon00");
+  await page.type("#quick_pass", "pass");
 
   //нажимаем на кнопку по селектору кнопки на сайте (кнопка войти)
   await page.click("#quick_login_button");
