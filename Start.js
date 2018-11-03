@@ -4,7 +4,7 @@ const puppeteer = require("puppeteer");
 
 //подключаем свой модуль для обработки и сбора информации со страниц
 const scraping = require("./engine/scraping.js");
-//
+
 //создаем константу вызова функции которая имеет ссылку на функцию
 const scrape = async function() {
   //запуск браузера и запись в переменную ссылки на него ,
@@ -19,10 +19,10 @@ const scrape = async function() {
   await page.goto("https://vk.com/id271572369");
 
   //берем селектор строки ввода на сайте и заполняем следующим параметром
-  await page.type("#quick_email", "login");
+  await page.type("#quick_email", "+79859766033");
 
   //аналогично ,но для селектора пароля
-  await page.type("#quick_pass", "pass");
+  await page.type("#quick_pass", "alexandrbluerose01");
 
   //нажимаем на кнопку по селектору кнопки на сайте (кнопка войти)
   await page.click("#quick_login_button");
@@ -33,15 +33,98 @@ const scrape = async function() {
   //переход на страницу друзей
   await page.goto("https://vk.com/friends");
 
+  //вызываем функцию пролистывания страницы(до конца вниз)
+  await scroll_page(page);
+
+  //блочим загрузки картинок со страницы для оптимизации
+  await page.setRequestInterception(true);
+  page.on("request", request => {
+    if (request.resourceType() === "image") request.abort();
+    else request.continue();
+  });
+
+  //вызываем функцию пролистывания страницы(до конца вниз)
+  //параметры:
+  //1)page:страница с которой работаем
+  //2)дистанция на которую прокручивается страница
+  //3)через сколько  повторится прокручивание(мкс)
+  await scroll_page(page, 2000, 70);
+
+  //ожидаем 2 секунды
+  await page.waitFor(2000);
+
+  //вызываем функцию для сбора обьектов исследования(имен людей,их ссылок их количества)
+  //для дальнейшей работы с ними и записываем все в константу
+  const info_all_pages = await collectFriends(page);
+
+  //выводим в консоль в формате Json
+  console.log(JSON.stringify(info_all_pages, null, 2));
+
+  console.log("\nВывод информации о людях:\n");
+
+  //переменная хранящая информацию о всех людях
+  const info_peoples = new Array();
+  for (let a = 0; a < info_all_pages.length; a++) {
+    //переходим по ссылкам обьектов(людей)
+    await page.goto(info_all_pages[a].href);
+
+    //ожидаем 1 секунду для загрузки страницы
+    await page.waitFor(1000);
+
+    //вызываем функцию которая собирает информацию со страницы и помещаем эту информацию в массив
+    info_peoples[a] = await get_info_page(page);
+
+    //выводим собранную  информацию сразу
+    console.log(JSON.stringify(info_all_pages[a].name, null, 2));
+    console.log(JSON.stringify(info_peoples[a], null, 2));
+  }
+
+  //закрываем браузер
+  await browser.close();
+
+  return "ok";
+};
+
+//обращаемся к функции ,функция then() используется для связывания
+//функций ,которые должны быть вызваны Promise. При успешном
+//выполнении выводит value,а при ошибке ничего(второго параметра нету,он
+//для ошибок)
+scrape().then(function(value) {
+  console.log(value);
+});
+
+//функция для сбора ссылок,имен и их колличества
+function collectFriends(page) {
+  //метод $$eval выполняет код на стороне браузера
+  const mass = page.$$eval(".friends_user_info", postPreviews =>
+    postPreviews.map(postPreview => ({
+      name: postPreview
+        .querySelector(".friends_field.friends_field_title")
+        .textContent.trim(),
+      numb: i++,
+      href: postPreview.querySelector(".friends_field.friends_field_title > a")
+        .href
+      //student: postPreview.querySelector('#profile_full > div:nth-child(3) > div.profile_info > div > div.labeled > a:nth-child(1)').textContent.trim()
+    }))
+  );
+  return mass;
+}
+
+//функция пролистывания страницы до нижней границы(параметр:переменная содержащая адрес страницы с которой мы работаем
+//ее используем чтобы вызвать evaluate)
+function scroll_page(page, dist, speed) {
   //метод evaluate позволяет использовать команды DOM такие как window,document и тд.
-  await page.evaluate(async function() {
+  page.evaluate(async function() {
     //функция promise
+    //let scr = new Scroll(0, 2000, 0, 0);
+    // scr.Scroll_;
     await new Promise(function(resolve, reject) {
+      //function scr() {
       //переменная хранящая дистанцию которую мы проходим и суммируем
       let totalHeight = 0;
 
       //дистанция на которую прокручивается страница
-      let distance = 2000;
+      let distance = dist;
 
       //таймер содержащий ссылку на метод SetInterval которая выполняет
       //функцию(это первый аргумент метода) ,регулярно повторяя ее через
@@ -66,80 +149,23 @@ const scrape = async function() {
         }
 
         //Через сколько повторится функция(мкс)
-      }, 70);
+      }, speed);
     });
   });
+}
 
-  //блочим загрузки картинок со страницы для оптимизации
-  await page.setRequestInterception(true);
-  page.on("request", request => {
-    if (request.resourceType() === "image") request.abort();
-    else request.continue();
-  });
-
-  //переменная счетчик
-  let i = 0;
-
+function get_info_page(page) {
   //метод $$eval выполняет код на стороне браузера
-  const div2 = await page.$$eval(".friends_user_info", postPreviews =>
-    postPreviews.map(postPreview => ({
-      name: postPreview
-        .querySelector(".friends_field.friends_field_title")
-        .textContent.trim(),
-      numb: i++,
-      href: postPreview.querySelector(".friends_field.friends_field_title > a")
-        .href
-      //student: postPreview.querySelector('#profile_full > div:nth-child(3) > div.profile_info > div > div.labeled > a:nth-child(1)').textContent.trim()
-    }))
-  );
+  //в inf сохраняем информацию которую взяли с одной страницы
+  const inf = page.$$eval(
+    "#page_info_wrap",
 
-  const divFin = new Array();
-  for (let a = 0; a < div2.length; a++) {
-    //let k = 1;
-
-    await page.goto(div2[a].href);
-    await page.waitFor(1000);
-    divFin[a] = await page.$$eval(
-      "#page_info_wrap",
-
-      postPreviews =>
-        postPreviews.map(postPreview => ({
-          name: postPreview
-            .querySelector("#profile_short > div:nth-child(1) > div.labeled")
-            .textContent.trim()
-        }))
-    );
-    console.log(JSON.stringify(divFin[a], null, 2));
-    await page.click(
-      "#profile_friends > a.module_header > div > span.header_label.fl_l"
-    );
-    await page.waitFor(1000);
-    const div222 = await page.$$eval(".friends_user_info", postPreviews =>
+    postPreviews =>
       postPreviews.map(postPreview => ({
-        name: postPreview
-          .querySelector(".friends_field.friends_field_title")
-          .textContent.trim(),
-        numb: i++,
-        href: postPreview.querySelector(
-          ".friends_field.friends_field_title > a"
-        ).href
-        //student: postPreview.querySelector('#profile_full > div:nth-child(3) > div.profile_info > div > div.labeled > a:nth-child(1)').textContent.trim()
+        info: postPreview
+          .querySelector("#profile_short > div:nth-child(1) > div.labeled")
+          .textContent.trim()
       }))
-    );
-    await page.waitFor(10000);
-  }
-
-  //закрываем браузер
-  await browser.close();
-  return "ok";
-};
-
-//обращаемся к функции ,функция then() используется для связывания
-//функций ,которые должны быть вызваны Promise. При успешном
-//выполнении выводит value,а при ошибке ничего(второго параметра нету,он
-//для ошибок)
-scrape().then(function(value) {
-  console.log(value);
-});
-
-function collectFriends() {}
+  );
+  return inf;
+}
