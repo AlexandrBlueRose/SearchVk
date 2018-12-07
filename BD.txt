@@ -1,0 +1,15 @@
+﻿<start_BD>=
+<human_>=0
+<name>=Михаил Румянцев
+<gender>=male
+<age>=[object Object]
+<school>=null
+<school_class>=null
+<school_graduation>=null
+<University>=МИЭТ
+<University_faculty>=null
+<University_graduation>=null
+<country>=Россия
+<region>=Москва
+<img>=null
+<end_human_>=0
