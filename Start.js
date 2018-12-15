@@ -1,3 +1,4 @@
+//////////////////////////////////////////////////////////////
 //тут инфа по проге
 /*
  * ошибки:
@@ -363,8 +364,10 @@ async function async_sleep(time) {
 async function core_serch_task() {
   //функция задачи - поиск
 
-  const find_href_count = 15;
+  const find_href_count = 1; //поменял для дебага
 
+  //можно собрать количество
+  //let count = await page.$eval("#results", elem => elem.childElementCount);
   this.etap = 1.1;
   this.page_hum_find = await browser_core.newPage();
   let href_mass = undefined;
@@ -861,7 +864,10 @@ async function vk_find(page, start, count) {
   //вернет массив ссылок или undefined
   //const step = kol;
   let infoHref = 0;
-  infoHref = await LinksScripe(page, start / 15);
+  //для отладки можно узнать кол-во эл-тов в селекторе(наследников)
+  //count = await page.$eval("#results", elem => elem.childElementCount);
+  //второй аргумент номер блока(страницы -начинающейся с 1)
+  infoHref = await LinkedScripe(page, start + 1); //вторым аргументом не должен идти 0
   //infoHref = await collectFriendsParam(page, 0);
   //}
   if (infoHref !== null) {
@@ -873,6 +879,21 @@ async function vk_find(page, start, count) {
   } else {
     return 0;
   }
+}
+
+async function LinkedScripe(page, index) {
+  //Сейчас использую эту для сбора ссылок
+  let st = index;
+  const mass = await page.$$eval(
+    "#results > div:nth-child(" + st + ")",
+    postPreviews =>
+      postPreviews.map(postPreview => ({
+        href: postPreview.querySelector(
+          "#results > div > div.info > div.labeled.name > a"
+        ).href
+      }))
+  );
+  return mass;
 }
 //функция для сбора ссылок
 /*async function LinksScripe(page, index) {
@@ -890,7 +911,7 @@ async function vk_find(page, start, count) {
     return a;
 }*/
 function LinksScripe(page, index) {
-  let st = index;
+  let st = index + 1;
   //#results > div:nth-child(1)
   //.info
   //.labeled.name
