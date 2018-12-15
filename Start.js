@@ -1,5 +1,8 @@
 //тут инфа по проге
 /*
+ * ошибки:
+ * при чтении массива human'ов в поиске возможно переполнение массива
+ * //
  * индексы тасков и сигналов и систем в менеджере начинаютя с 's' (s1, s2, s3 и т.д.)
  * коды систем:
  * s0 = менеджер
@@ -7,13 +10,17 @@
  * коды сигналов:
  * 0 = стоп, параметр: id останавливаемой системы/таска
  * -1 = пустой сигнал
- * 1 = добавить остановленный таск в очередь, парометры: id таска
- * 2 = запрос к БД с начальным поиском совпадений, параметры: human_base
+ * 1 = добавить остановленный таск в очередь, парометры: [0] id таска
+ * 2 = запрос к БД с поиском совпадений, параметры: [0] human_base
+ * 3 = запрос к БД об записи human'а, параметры: [0] human; [1] human_base.id
+ * 4 = сигнал окончания таска поиска, параметры: [0] end_humans_mass; [1] true/false успешность
+ * 5 = сигнал к БД на поиск связей, параметры: [0] human_base
  */
 "use strict";
 //инициализация
 console.log("Hello world1");
 const puppeteer = require("puppeteer"); //пупетин
+var browser_core; //браузер
 //файл
 var fs = require("fs"); //файловая система/читалка/писалка в файл
 
@@ -24,7 +31,7 @@ class Human {
     //это джаваскрипт, детка! свойства/переменные для лохов! конструктор пацанам!
     this.name = null;
     this.gender = "all"; // male/all/female
-    this.age = -1;
+    this.age = null;
     this.school = null;
     this.school_class = null;
     this.school_graduation = null;
@@ -33,7 +40,6 @@ class Human {
     this.University_graduation = null;
     this.country = "Россия";
     this.region = null;
-    this.city = null;
     this.img = null;
     //флаги
     this.photo = false;
@@ -145,6 +151,10 @@ class Meneger {
   }
   //signals func
   add_signal(signal) {
+    if (signal.code == 4) {
+      console.log("debag");
+    }
+
     let new_id = this.free_signals_id.pop();
     if (new_id == undefined) {
       new_id = this.signals_max_id;
@@ -180,6 +190,16 @@ class Meneger {
         }
         case 1: {
           this.add_task_in_queue(this.signals[signal_id].objects[0]);
+          break;
+        }
+        case 4: {
+          // * 4 = сигнал окончания таска поиска, параметры: [0] end_humans_mass; [1] true/false успешность
+          if (this.signals[signal_id].objects[1] == true) {
+            console.log("great task!");
+          } else {
+            console.log("bad task!");
+          }
+          console.log(this.signals[signal_id].objects[0]);
           break;
         }
         default:
@@ -237,7 +257,6 @@ class Signal {
 class Data_base {
   //BD
   constructor() {}
-  new_BD() {}
 
   load_human(id) {
     let text = fs.readFileSync("BD.txt", "utf8");
@@ -324,11 +343,6 @@ class Data_base {
   }
 }
 
-class Search_system {
-  //поисковик
-  constructor() {}
-}
-
 //функции
 
 //для записи и чтения в файл пометки
@@ -348,83 +362,466 @@ async function async_sleep(time) {
 //serch_task
 async function core_serch_task() {
   //функция задачи - поиск
-  /*
-    let i = 0;
-    while (i < 1000) {
-        console.log(i);
-        await async_sleep(1000);
-        i++;
-        if (this.run_flag == false) {
-            this.stop_func();
-            return null;
-        }
-    }
-    console.log('Time serch!');
-    */
-  /*
-    let etap = 0;
-    let href_mass = undefined;
-    let humans_mass = new Array(0);
-    let human_base = this.objects[0];
-    //первый этап
-    //создание запроса к БД
-    let sign_bd_1 = new Signal();
-    sign_bd_1.code = 2;
-    sign_bd_1.objects[0] = human_base;
-    sign_bd_1.system_id = "s1";
-    sign_bd_1.priority = 98;
-    sign_bd_1.source = this.id;
-    this.meneger.add_signal(sign_bd_1);
+
+  const find_href_count = 15;
+
+  this.etap = 1.1;
+  this.page_hum_find = await browser_core.newPage();
+  let href_mass = undefined;
+  this.href_step = 0;
+  this.humans_mass = new Array(0);
+  let human_base = this.objects[0];
+  let min_accuracu = min_accuracy_base(human_base);
+  let flag_end_task = false;
+  //первый этап
+  //создание запроса к БД
+  let sign_bd_1 = new Signal();
+  sign_bd_1.code = 2;
+  sign_bd_1.objects[0] = human_base;
+  sign_bd_1.system_id = "s1";
+  sign_bd_1.priority = 98;
+  sign_bd_1.source = this.id;
+  this.meneger.add_signal(sign_bd_1);
+  //проверка остановки
+  if (this.run_flag == false) {
+    this.stop_func();
+    return null;
+  }
+  //продолжаем этап
+  this.etap = 1.2;
+  //создаем страницу
+  let page_1_2 = await browser_core.newPage();
+  //старт поиска
+  await vk_find_start(page_1_2, human_base.human);
+  //поиск
+  let flag_stop_find = true; //флаг есть ли ещё ссылки ссылкок
+  while (flag_stop_find) {
     //проверка остановки
     if (this.run_flag == false) {
+      this.stop_func();
+      return null;
+    }
+    //берем ссылки
+    href_mass = await vk_find(page_1_2, this.href_step, find_href_count);
+    for (let i = 0; i < find_href_count; i++) {
+      //проверяем ссылки
+      if (href_mass[i] != undefined) {
+        //обработка ссылки найденного человека
+        this.humans_mass.push(
+          await vk_info_page(this.page_hum_find, href_mass[i])
+        );
+        new_accuracy(this.humans_mass[this.humans_mass.length - 1], human_base); //проверка и выставление достоверности
+        if (
+          this.humans_mass[this.humans_mass.length - 1].accuracy > min_accuracu
+        ) {
+          //добавляем в БД
+          let sign_bd_3 = new Signal();
+          sign_bd_3.code = 3;
+          sign_bd_3.objects[0] = this.humans_mass[this.humans_mass.length - 1];
+          sign_bd_3.objects[1] = human_base.id;
+          sign_bd_3.system_id = "s1";
+          sign_bd_3.priority = 99;
+          sign_bd_3.source = this.id;
+          this.meneger.add_signal(sign_bd_3);
+        }
+        this.href_step++;
+      } else {
+        flag_stop_find = false; //найден пустой объект, ссылки кончились
+        break;
+      }
+      //проверка остановки
+      if (this.run_flag == false) {
         this.stop_func();
         return null;
+      }
     }
-    //продолжаем этап
-    etap = 1.2;
-    href_mass = vk_find();
-    for (let i = 0; i < href_mass; i++) {
-        let hum = vk_info_page(href_mass[i]); //сбор инфы со страницы
-        new_accuracy(hum, human_base); //проверка достоверности
-        humans_mass.push(hum); //добвление в массив
+  }
+  //итог 1 этапа:
+  this.etap = 1.3;
+  let max_accuracy = max_accuracy_base(human_base);
+  let end_humans_mass = new Array(0);
+  for (let i = 0; i < this.humans_mass.length; i++) {
+    if (this.humans_mass[i].accuracy > max_accuracy) {
+      flag_end_task = true;
+      end_humans_mass.push(this.humans_mass[i]);
     }
-    */
-  //console.log("serch!");
-
-  let navigation_promise = null;
-  const browser = await puppeteer.launch({ headless: false });
-  const page1 = await browser.newPage();
-  await page1.goto("https://vk.com").catch(e => {
-    throw e;
-  });
-  let Human1 = new Human();
-  //ввод логина, пороля
-  await page1.type("#index_email", "+79859766033", { delay: 10 }); //логин
-  await page1.type("#index_pass", "alexandrbluerose01", { delay: 10 }); //пароль
-  await page1.waitFor(100);
-  //чужей "компьютер"
-  await page1.click("#index_expire"); //галочка "чужей"
-  await page1.waitFor(100);
-  //логиниться (вход)
-  navigation_promise = page1.waitForNavigation({ timeout: 0 }); //обновляем ждалку навигации
-  await page1.click("#index_login_button"); //вход
-  await navigation_promise; //ждем завершения навигации (если кнопка нас не отправила - ждем вечно =) )
-  //переход-поиск
-  navigation_promise = page1.waitForNavigation({ timeout: 0 });
-  await page1.click("#l_fr"); //друзья
-  await navigation_promise;
-  await page1.goto("https://vk.com/friends");
-  const pages = await vk_find(page1, 1, 30);
-  //в качетсве примера во 2 аргумент передан 0(1)элемент для теста(в последствии будет цикл)
-  await vk_info_page(page1, pages[0], Human1);
-
+    //проверка остановки
+    if (this.run_flag == false) {
+      this.stop_func();
+      return null;
+    }
+  }
+  if (flag_end_task == true) {
+    //конец таска!
+    let sign_4 = new Signal();
+    sign_4.code = 4;
+    sign_4.objects[0] = end_humans_mass;
+    sign_4.objects[1] = true;
+    sign_4.system_id = "s0";
+    sign_4.priority = 99;
+    sign_4.source = this.id;
+    this.meneger.add_signal(sign_4);
+    this.run_flag = false;
+    return 0;
+  }
+  //второй этап
+  this.etap = 2;
+  //проверка остановки
+  if (this.run_flag == false) {
+    this.stop_func();
+    return null;
+  }
+  //сигнал к БД о поиске связей
+  let sign_bd_2_1 = new Signal();
+  sign_bd_2_1 = 5;
+  sign_bd_2_1.objects[0] = human_base;
+  sign_bd_2_1.system_id = "s1";
+  sign_bd_2_1.priority = 97;
+  sign_bd_2_1.source = this.id;
+  this.meneger.add_signal(sign_bd_2_1);
+  //продолжение этапа
+  this.etap = 2.2;
+  //проверка остановки
+  if (this.run_flag == false) {
+    this.stop_func();
+    return null;
+  }
+  //копируем хумана
+  let human_short = Object.assign({}, human_base.human);
+  let page_2_2 = await browser_core.newPage();
+  this.find_human = find_human; //добавляем функцию для использования
+  let new_hum_mass = 0;
+  //этап 2_2_+
+  for (let i_et = 0; i < 3; i++) {
+    human_short = Object.assign({}, human_base.human); //"откат"
+    //проверка этапа
+    if (i_et == 1) {
+      this.etap = this.etap + 0.01;
+      //отброс вуза
+      if (human_short.University != null) {
+        human_short.University = null;
+        human_short.University_faculty = null;
+        human_short.University_graduation = null;
+        new_hum_mass = await this.find_human(
+          human_base,
+          human_short,
+          page_2_2,
+          min_accuracu,
+          find_href_count
+        );
+        if (new_hum_mass.flag == false) {
+          //стоп //проверка остановки
+          if (this.run_flag == false) {
+            this.stop_func();
+            return null;
+          }
+        }
+        //итог этапа:
+        let end_humans_mass = new Array(0);
+        for (let i = 0; i < new_hum_mass.mass.length; i++) {
+          if (new_hum_mass.mass[i].accuracy > max_accuracy) {
+            flag_end_task = true;
+            end_humans_mass.push(new_hum_mass.mass[i]);
+          }
+          //проверка остановки
+          if (this.run_flag == false) {
+            this.stop_func();
+            return null;
+          }
+        }
+        if (flag_end_task == true) {
+          //конец таска!
+          let sign_4 = new Signal();
+          sign_4.code = 4;
+          sign_4.objects[0] = end_humans_mass;
+          sign_4.objects[1] = true;
+          sign_4.system_id = "s0";
+          sign_4.priority = 99;
+          sign_4.source = this.id;
+          this.meneger.add_signal(sign_4);
+          this.run_flag = false;
+          return 0;
+        }
+        //запись полученных human'ов
+        for (let i = 0; i < new_hum_mass.mass.length; i++) {
+          if (new_hum_mass.mass[i].accuracy >= min_accuracu)
+            this.humans_mass.push(new_hum_mass.mass[i]);
+        }
+        new_hum_mass = 0; //чистим
+      } else {
+        i_et++; //пропуск этапа
+      }
+    }
+    if (i_et == 2) {
+      this.etap = this.etap + 0.01;
+      //отброс города
+      if (human_short.region != null) {
+        human_short.region = null;
+        new_hum_mass = await this.find_human(
+          human_base,
+          human_short,
+          page_2_2,
+          min_accuracu,
+          find_href_count
+        );
+        if (new_hum_mass.flag == false) {
+          //стоп //проверка остановки
+          if (this.run_flag == false) {
+            this.stop_func();
+            return null;
+          }
+        }
+        //итог этапа:
+        let end_humans_mass = new Array(0);
+        for (let i = 0; i < new_hum_mass.mass.length; i++) {
+          if (new_hum_mass.mass[i].accuracy > max_accuracy) {
+            flag_end_task = true;
+            end_humans_mass.push(new_hum_mass.mass[i]);
+          }
+          //проверка остановки
+          if (this.run_flag == false) {
+            this.stop_func();
+            return null;
+          }
+        }
+        if (flag_end_task == true) {
+          //конец таска!
+          let sign_4 = new Signal();
+          sign_4.code = 4;
+          sign_4.objects[0] = end_humans_mass;
+          sign_4.objects[1] = true;
+          sign_4.system_id = "s0";
+          sign_4.priority = 99;
+          sign_4.source = this.id;
+          this.meneger.add_signal(sign_4);
+          this.run_flag = false;
+          return 0;
+        }
+        //запись полученных human'ов
+        for (let i = 0; i < new_hum_mass.mass.length; i++) {
+          if (new_hum_mass.mass[i].accuracy >= min_accuracu)
+            this.humans_mass.push(new_hum_mass.mass[i]);
+        }
+        new_hum_mass = 0; //чистим
+      } else {
+        i_et++; //пропуск этапа
+      }
+    }
+    //отброс школы
+    {
+      this.etap = this.etap + 0.01;
+      if (human_short.school != null) {
+        human_short.school = null;
+        human_short.school_class = null;
+        human_short.school_graduation = null;
+        new_hum_mass = await this.find_human(
+          human_base,
+          human_short,
+          page_2_2,
+          min_accuracu,
+          find_href_count
+        );
+        if (new_hum_mass.flag == false) {
+          //стоп //проверка остановки
+          if (this.run_flag == false) {
+            this.stop_func();
+            return null;
+          }
+        }
+        //итог этапа:
+        let end_humans_mass = new Array(0);
+        for (let i = 0; i < new_hum_mass.mass.length; i++) {
+          if (new_hum_mass.mass[i].accuracy > max_accuracy) {
+            flag_end_task = true;
+            end_humans_mass.push(new_hum_mass.mass[i]);
+          }
+          //проверка остановки
+          if (this.run_flag == false) {
+            this.stop_func();
+            return null;
+          }
+        }
+        if (flag_end_task == true) {
+          //конец таска!
+          let sign_4 = new Signal();
+          sign_4.code = 4;
+          sign_4.objects[0] = end_humans_mass;
+          sign_4.objects[1] = true;
+          sign_4.system_id = "s0";
+          sign_4.priority = 99;
+          sign_4.source = this.id;
+          this.meneger.add_signal(sign_4);
+          this.run_flag = false;
+          return 0;
+        }
+        //запись полученных human'ов
+        for (let i = 0; i < new_hum_mass.mass.length; i++) {
+          if (new_hum_mass.mass[i].accuracy >= min_accuracu)
+            this.humans_mass.push(new_hum_mass.mass[i]);
+        }
+        new_hum_mass = 0; //чистим
+      }
+    }
+    //отброс возраста
+    {
+      this.etap = this.etap + 0.01;
+      if (human_short.age != null) {
+        human_short.age = null;
+        new_hum_mass = await this.find_human(
+          human_base,
+          human_short,
+          page_2_2,
+          min_accuracu,
+          find_href_count
+        );
+        if (new_hum_mass.flag == false) {
+          //стоп //проверка остановки
+          if (this.run_flag == false) {
+            this.stop_func();
+            return null;
+          }
+        }
+        //итог этапа:
+        let end_humans_mass = new Array(0);
+        for (let i = 0; i < new_hum_mass.mass.length; i++) {
+          if (new_hum_mass.mass[i].accuracy > max_accuracy) {
+            flag_end_task = true;
+            end_humans_mass.push(new_hum_mass.mass[i]);
+          }
+          //проверка остановки
+          if (this.run_flag == false) {
+            this.stop_func();
+            return null;
+          }
+        }
+        if (flag_end_task == true) {
+          //конец таска!
+          let sign_4 = new Signal();
+          sign_4.code = 4;
+          sign_4.objects[0] = end_humans_mass;
+          sign_4.objects[1] = true;
+          sign_4.system_id = "s0";
+          sign_4.priority = 99;
+          sign_4.source = this.id;
+          this.meneger.add_signal(sign_4);
+          this.run_flag = false;
+          return 0;
+        }
+        //запись полученных human'ов
+        for (let i = 0; i < new_hum_mass.mass.length; i++) {
+          if (new_hum_mass.mass[i].accuracy >= min_accuracu)
+            this.humans_mass.push(new_hum_mass.mass[i]);
+        }
+        new_hum_mass = 0; //чистим
+      }
+    }
+  }
+  //конец
+  //конец таска!
+  let sign_4 = new Signal();
+  sign_4.code = 4;
+  sign_4.objects[0] = null;
+  sign_4.objects[1] = false;
+  sign_4.system_id = "s0";
+  sign_4.priority = 99;
+  sign_4.source = this.id;
+  this.meneger.add_signal(sign_4);
+  this.run_flag = false;
   return 0;
 }
-async function scrollBeta(page, step) {
-  for (let i = 0; i < step; i++) {
-    await page.keyboard.press("PageDown");
+
+//функция для поиска, вернет obj0.mass = массив human'ов и obj0.flag = false если не до конца дошел, производит запись в БД (сигналами), исключает уже найденных human'ов
+async function find_human(
+  human_base,
+  human,
+  page,
+  min_accuracu,
+  find_href_count
+) {
+  let humans_mass = new Array(0);
+  let href_mass;
+  let href_step = 0;
+  //старт поиска
+  await vk_find_start(page, human);
+  //поиск
+  let flag_stop_find = true; //флаг есть ли ещё ссылки ссылкок
+  while (flag_stop_find) {
+    //проверка остановки
+    if (this.run_flag == false) {
+      let obj0 = 0;
+      obj0.mass = humans_mass;
+      obj0.flag = false;
+      return obj0;
+    }
+    //берем ссылки
+    href_mass = await vk_find(page, href_step, find_href_count);
+    for (let i = 0; i < find_href_count; i++) {
+      //проверяем ссылки
+      if (href_mass[i] != undefined) {
+        if (is_rerun_human(href_mass[i], this.humans_mass) == false) {
+          //обработка ссылки найденного человека
+          humans_mass.push(
+            await vk_info_page(this.page_hum_find, href_mass[i])
+          );
+          new_accuracy(humans_mass[humans_mass.length - 1], human_base); //проверка и выставление достоверности
+          if (humans_mass[humans_mass.length - 1].accuracy > min_accuracu) {
+            //добавляем в БД
+            let sign_bd_3 = new Signal();
+            sign_bd_3.code = 3;
+            sign_bd_3.objects[0] = humans_mass[humans_mass.length - 1];
+            sign_bd_3.objects[1] = human_base.id;
+            sign_bd_3.system_id = "s1";
+            sign_bd_3.priority = 99;
+            sign_bd_3.source = this.id;
+            this.meneger.add_signal(sign_bd_3);
+          }
+          href_step++;
+        }
+      } else {
+        flag_stop_find = false; //найден пустой объект, ссылки кончились
+        break;
+      }
+      //проверка остановки
+      if (this.run_flag == false) {
+        let obj0 = 0;
+        obj0.mass = humans_mass;
+        obj0.flag = false;
+        return obj0;
+      }
+    }
   }
+  let obj0 = 0;
+  obj0.mass = humans_mass;
+  obj0.flag = true;
+  return obj0;
 }
+//проверяет наличие human'а с такой ссылкой (для исключения повторов)
+function is_rerun_human(href, human_mass) {
+  //доделать
+  return false;
+}
+
+async function run_serch_task() {
+  //запускающая функция задачи - поиск
+  this.core_func();
+  return 0;
+}
+
+async function signals_serch_task(signal) {
+  //запускающая функция задачи - поиск
+  switch (signal.code) {
+    case 0: {
+      this.run_flag = false;
+      meneger.stop_task(this.id);
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+  return 0;
+}
+
 async function stop_serch_task() {
   //останавливающая функция задачи - поиск
 
@@ -437,67 +834,77 @@ async function stop_serch_task() {
   this.meneger.add_signal(signal1);
   return 0;
 }
-//
+
+//функци поиска
+//находит "коффициент достоверности" human
 function new_accuracy(human, human_base) {
   //находит "коффициент достоверности" human
-  return 0;
+  human.accuracy = 99;
+  return 99;
 }
-//
-//функци поиска
-async function vk_find(page, index1, kol) {
+//находит минимальный коф достоверности базы
+function min_accuracy_base(human_base) {
+  return 10;
+}
+//находит макс коф достоверности базы
+function max_accuracy_base(human_base) {
+  return 90;
+}
+//с пустой странице перейдет к результатам поиска
+async function vk_find_start(page, human) {
+  //с пустой странице перейдет к результатам поиска
+  await VK_Find("+79067432629", "Vasya211", human, false, page);
+}
+//вернет массив ссылок или undefined, page = страница с результатами поиска
+async function vk_find(page, start, count) {
+  //вернет массив ссылок или undefined, page = страница с результатами поиска
   //вернет массив ссылок или undefined
-  //const step=await page.querySelector('#search_header > div.page_block_header_inner._header_inner > span');
-
-  const step = kol;
-  await scrollBeta(page, step);
-  // let count = 0;
-  // count = await page.$eval("#list_content", elem => elem.childElementCount);
-  //let infoHref = null;
-  //for (let i = index1; i < count; i++) {
+  //const step = kol;
   let infoHref = 0;
-  infoHref = await LinksScripe(page, index1);
+  infoHref = await LinksScripe(page, start / 15);
   //infoHref = await collectFriendsParam(page, 0);
   //}
   if (infoHref !== null) {
-    return infoHref;
+    let mass = new Array();
+    for (let i = 0; i < infoHref.length; i++) {
+      mass.push(infoHref[i].href);
+    }
+    return mass;
   } else {
     return 0;
   }
 }
-
-//функция для сбора ссылок,имен и их колличества в одинарный массив
-//name - имя, numb - номер человека, href - ссылка
-function collectFriends(page) {
-  //метод $$evaьь l выполняет код на стороне браузера
-  //#friends_list
-  //#friends_user_row110436895 > div.friends_user_info
-  const mass = page.$$eval(".friends_user_info", postPreviews =>
-    postPreviews.map(postPreview => ({
-      name: postPreview
-        .querySelector(".friends_field.friends_field_title")
-        .textContent.trim(),
-      numb: i++,
-      href: postPreview.querySelector(".friends_field.friends_field_title > a")
-        .href
-      //student: postPreview.querySelector('#profile_full > div:nth-child(3) > div.profile_info > div > div.labeled > a:nth-child(1)').textContent.trim()
-    }))
-  );
-  return mass;
-}
+//функция для сбора ссылок
+/*async function LinksScripe(page, index) {
+    let st = index;
+    //page.waitForSelector();
+    let a = page.$eval(
+        "#list_content > div:nth-child(" + st + ")",
+        pp =>
+            Array.from(pp.querySelectorAll(".friends_user_info")).map(link => ({
+                href: link.querySelector(".friends_field.friends_field_title > a")
+                    .href
+            })),
+        st
+    );
+    return a;
+}*/
 function LinksScripe(page, index) {
   let st = index;
+  //#results > div:nth-child(1)
+  //.info
+  //.labeled.name
   const a = page.$eval(
-    "#list_content > div:nth-child(" + st + ")",
+    "#results > div:nth-child(" + st + ")",
     pp =>
-      Array.from(pp.querySelectorAll(".friends_user_info")).map(link => ({
-        name: link
-          .querySelector(".friends_field.friends_field_title")
-          .textContent.trim()
+      Array.from(pp.querySelectorAll(".info")).map(link => ({
+        name: link.querySelector(".labeled.name").href
       })),
     st
   );
   return a;
 }
+
 async function get_info_for_get_info(page, str) {
   //метод $$eval выполняет код на стороне браузера
   //в inf сохраняем информацию которую взяли с одной страницы
@@ -536,12 +943,14 @@ async function get_info_from_page(page, str) {
   return inf;
 }
 
-async function vk_info_page(page, info, HumanList) {
+//вернет human по ссылке
+async function vk_info_page(page, href) {
   //вернет human
+  let HumanList = new Human();
   const atribute1 = "День рождения:";
   const atribute2 = "Город:";
   const atribute3 = "Место учёбы:";
-  await page.goto(info.href);
+  await page.goto(href);
   let count = 0;
   count = await page.$eval("#profile_short", elem => elem.childElementCount);
   if (count == 0 || count == 1) {
@@ -550,6 +959,7 @@ async function vk_info_page(page, info, HumanList) {
     HumanList.University = "Не указано";
   } else {
     for (let j = 1; j < count; j++) {
+      //
       const infoPage = await get_info_from_page(page, j);
       const infoBlock = await get_info_for_get_info(page, j);
       if (infoBlock[0].info == atribute1) {
@@ -564,31 +974,7 @@ async function vk_info_page(page, info, HumanList) {
     }
   }
   console.log("ok");
-  return 0;
-}
-
-//
-
-async function run_serch_task() {
-  //запускающая функция задачи - поиск
-
-  this.core_func();
-  return 0;
-}
-
-async function signals_serch_task(signal) {
-  //запускающая функция задачи - поиск
-  switch (signal.code) {
-    case 0: {
-      this.run_flag = false;
-      meneger.stop_task(this.id);
-      break;
-    }
-    default: {
-      break;
-    }
-  }
-  return 0;
+  return HumanList;
 }
 
 //_new_human_base_task
@@ -601,6 +987,7 @@ async function stop_new_human_base_task() {
   //останавливающая функция задачи - поиск
   return 0;
 }
+
 async function signals_new_human_base_task(signal) {
   //останавливающая функция задачи - поиск
   return 0;
@@ -613,6 +1000,11 @@ async function run_new_human_base_task() {
   return 0;
 }
 //иные
+async function scrollBeta(page, step) {
+  for (let i = 0; i < step; i++) {
+    await page.keyboard.press("PageDown");
+  }
+}
 async function dropdown_list(page, selector, value) {
   //тут ожидание ЗАГРУЗКИ выбора города, ПЕРЕДЕЛАТЬ!!!
   await page.waitFor(1000); //!!!
@@ -622,44 +1014,10 @@ async function dropdown_list(page, selector, value) {
   await page.keyboard.press("Enter"); //выбор первого найденного
   return 0;
 }
-//тестовая
-async function Find_picture() {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  await page.goto("https://yandex.ru").catch(e => {
-    throw e;
-  });
-  let ret = 0;
-  //await page.screenshot({ path: 'skreen_yandex.png' }).catch((e) => { throw e; });
-  //
-  await page.waitFor(1000); //опустить можно
-  await page.click(
-    "body > div.container.rows > div.row.rows__row.rows__row_main > div.col.main.widgets > div.container.container__search.container__line > div > div.col.col_home-arrow > div > div.home-arrow__tabs > div > a:nth-child(2)"
-  );
-  await page.waitFor(1000); //опустить можно
-  await page.click(
-    "#feed > div > div > div:nth-child(1) > div:nth-child(1) > div > a"
-  );
-
-  //тест
-  await page.waitFor(10); //опустить можно
-  await page.screenshot({ path: "skreen_yandex.png" }).catch(e => {
-    throw e;
-  });
-  ret = await page.evaluate(() => {
-    return document.querySelector(".layout__desc__text").innerText;
-  });
-  //
-  await browser.close();
-  // console.log(ret);
-  return ret;
-  //console.log('Hello world2');
-}
-
-async function VK_Find(login, password, human, with_img, browser) {
+async function VK_Find(login, password, human, with_img, page) {
   //
   //const browser = await puppeteer.launch({ headless: false });//новый браузер
-  let page1 = await browser.newPage(); //новая страница
+  let page1 = page; //новая страница
   let navigation_promise = page1.waitForNavigation({ timeout: 0 }); //ждалка навигации
   await page1.goto("https://vk.com/", { timeout: 0 }).catch(e => {
     throw e;
@@ -682,13 +1040,16 @@ async function VK_Find(login, password, human, with_img, browser) {
   await navigation_promise;
   await page1.click("#ui_rmenu_find"); //поиск
   //расширенный поиск
+  //await page1.waitFor(3000);
+  await page1.waitForSelector("#friends_import_header > a");
   await page1.click("#friends_import_header > a"); //расширенный поиск
+  await page1.waitFor(300);
   //ввод - регион
   /*
-    await page1.click('#cCountry'); //выбор страны
-    await page1.type('#cCountry', human.country, { delay: 100 }); //ввод страны
-    await page1.keyboard.press('Enter'); //выбор первого найденного
-    */
+      await page1.click('#cCountry'); //выбор страны
+      await page1.type('#cCountry', human.country, { delay: 100 }); //ввод страны
+      await page1.keyboard.press('Enter'); //выбор первого найденного
+      */
   await dropdown_list(page1, "#cCountry", human.country); //выбор страны
   //await page1.waitFor(100);
   if (human.region !== null) {
@@ -719,6 +1080,31 @@ async function VK_Find(login, password, human, with_img, browser) {
   }
   //ввод возрата !=временно не работает
   if (human.age !== null) {
+    await page1.click(
+      "#container17 > table > tbody > tr > td.selector > input.selector_input.selected"
+    );
+    //#list_options_container_17
+    let counter = await page.$eval(
+      "#list_options_container_17",
+      elem => elem.childElementCount
+    );
+    //ot 14-80 do 14-80
+    //#option_list_options_container_17_2
+    //#option_list_options_container_17_3
+    let str;
+    //for (let i = 14; i < 80; i++) {
+    //    let j = 0;
+    //    j++;
+    //    if (human.age == i) {
+    //        str = j;
+    //    }
+    //}
+    str = human.age - 14;
+    await page1.click("#option_list_options_container_17_" + str);
+    await page1.click(
+      "#container18 > table > tbody > tr > td.selector > input.selector_input.selected"
+    );
+    await page1.click("#option_list_options_container_18_" + str);
     //await page1.select('#container18 > table > tbody > tr > td.selector', human.school_graduation+''); //от
     //await page1.select('#container19 > table > tbody > tr > td.selector', human.school_graduation + ''); //до
   }
@@ -749,104 +1135,56 @@ async function VK_Find(login, password, human, with_img, browser) {
     await page1.focus("#search_query");
     await page1.keyboard.press("Enter");
   }
-  //тест
-  await page1.waitFor(100); //опустить можно = ожидание для вида
-  //await page1.screenshot({ path: 'skreen_VK.png' }).catch((e) => { throw e; }); //делаенм селфи (скриншет)
-  //
-  //await browser.close(); //закрываемся
-  //
   return page1;
 }
-
-//код асинхронный
-async function code_start() {
-  let browser1 = await puppeteer.launch({ headless: false });
-  let human1 = new Human();
-  //чтение файла
-
-  human1.gender = "male";
-  //human1.age = 20;
-
-  human1.name = human1.name.substring(1, human1.name.length - 1); //чистим №0 элемент
-  human1.country = human1.country.substring(0, human1.country.length - 1); //чистим так остальные (если в конце нет пустой строки, то последний не чистим)
-  human1.region = human1.region.substring(0, human1.region.length - 1);
-  human1.University = human1.University.substring(
-    0,
-    human1.University.length - 1
-  );
-  /*
-    console.log(human1.name);
-    console.log(human1.name.length);
-    console.log(human1.country);
-    console.log(human1.country.length);
-    console.log(human1.region);
-    console.log(human1.region.length);
-    console.log(human1.University);
-    console.log(human1.University.length);
-    */
-
-  let page1 = await VK_Find(
-    "+79067432629",
-    "Vasya211",
-    human1,
-    false,
-    browser1
-  );
-  let akkaunts = await collectFriends(page1);
-  let page_humm = await browser1.newPage();
-  for (let i = 0; i < akkaunts.length; i++) {
-    console.log("FOR!! " + akkaunts[i].href);
-    await page_humm.goto(akkaunts[i].href, { timeout: 0 }).catch(e => {
-      throw e;
-    }); //открываем ВК
-    let human_text = await get_info_page(page_humm);
-    let human2 = human1;
-    human2.age = human_text[0];
-    console.log(human_text[0]);
-    await page_humm.waitFor(5000);
-    add_human(human2);
-  }
-
-  /*
-    add_human(human1);
-    let test_human = load_human(0);
-    test_human.age = 99;
-    add_human(test_human);
-    */
-  console.log("Hello world3");
-  browser1.close();
+//функция для сбора ссылок,имен и их колличества в одинарный массив
+//name - имя, numb - номер человека, href - ссылка
+/*
+async function collectFriends(page) {
+    //метод $$eval выполняет код на стороне браузера
+    const mass = page.$$eval("#results", postPreviews =>
+        postPreviews.map(postPreview => ({
+            name: postPreview
+                .querySelector("#results > div > div.info > div.labeled.name > a")
+                .textContent.trim(),
+            numb: i++,
+            href: postPreview.querySelector("#results > div > div.info > div.labeled.name > a")
+                .href
+            //student: postPreview.querySelector('#profile_full > div:nth-child(3) > div.profile_info > div > div.labeled > a:nth-child(1)').textContent.trim()
+        }))
+    );
+    return mass;
 }
-
+*/
 var program_flag_test = true;
-function test_meneger(meneger) {
-  setTimeout(() => {
-    meneger.run_next_signal();
-    meneger.run_next_task();
-    if (program_flag_test == true) test_meneger(meneger);
-  }, 1000);
-}
-
-try {
-  /*
-    Find_picture().then((retu) => {
-        console.log(retu);
-        console.log('Hello world3');
-    });
-    */
-  //code_start();//старт проги
+async function test_meneger() {
+  browser_core = await puppeteer.launch({ headless: false });
   let data_base = new Data_base();
   let meneger = new Meneger(data_base);
   let hum1 = new Human_base();
-  hum1.human.name = "misha";
-  let hum2 = new Human_base();
-  hum2.human.name = "kolya";
-  test_meneger(meneger);
-  meneger.new_serch_task(0, hum1);
-  //meneger.new_serch_task(1, hum2);
+  hum1.human.name = "Михаил Румянцев";
+  hum1.human.country = "Россия";
+  hum1.human.region = "Москва";
+  hum1.human.University = "МИЭТ";
+  meneger.new_serch_task(100, hum1);
   meneger.run_next_task();
-  // async_sleep(4000).then(() => {
-  //     meneger.stop_all_tasks();
-  // })
+  /*
+    let yyyy = 0;
+    while(yyyy<100000){
+        yyyy++;
+        setTimeout(() => {
+            meneger.run_next_signal();
+            meneger.run_next_task();
+            if (program_flag_test == true)
+                test_meneger(meneger);
+        }, 1000);
+    }
+    browser_core.close();
+    */
+}
+
+try {
+  test_meneger();
 } catch (e) {
   console.log(e);
 }
@@ -854,6 +1192,6 @@ try {
 setTimeout(() => {
   console.log("Time!");
   program_flag_test = false;
-}, 10000);
+}, 120000);
 console.log("Hello world2");
-//waitFor(100000
+//waitFor(100000);
