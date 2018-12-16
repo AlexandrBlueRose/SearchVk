@@ -394,6 +394,7 @@ async function core_serch_task() {
   this.etap = 1.2;
   //создаем страницу
   let page_1_2 = await browser_core.newPage();
+
   //старт поиска
   await vk_find_start(page_1_2, human_base.human);
   //поиск
@@ -756,6 +757,11 @@ async function find_human(
       obj0.flag = false;
       return obj0;
     }
+    await page.setRequestInterception(true);
+    page.on("request", request => {
+      if (request.resourceType() === "image") request.abort();
+      else request.continue();
+    });
     //берем ссылки
     href_mass = await vk_find(page, href_step, find_href_count);
     for (let i = 0; i < find_href_count; i++) {
@@ -867,6 +873,7 @@ async function vk_find(page, start, count) {
   //для отладки можно узнать кол-во эл-тов в селекторе(наследников)
   //count = await page.$eval("#results", elem => elem.childElementCount);
   //второй аргумент номер блока(страницы -начинающейся с 1)
+  await page.waitFor(100);
   infoHref = await LinkedScripe(page, start + 1); //вторым аргументом не должен идти 0
   //infoHref = await collectFriendsParam(page, 0);
   //}
@@ -881,6 +888,7 @@ async function vk_find(page, start, count) {
   }
 }
 
+//актуальный сбор инфы с поиска по людям
 async function LinkedScripe(page, index) {
   //Сейчас использую эту для сбора ссылок
   let st = index;
@@ -910,6 +918,7 @@ async function LinkedScripe(page, index) {
     );
     return a;
 }*/
+//сбор ссылок из раздела друзья(не актуален!!!!!)
 function LinksScripe(page, index) {
   let st = index + 1;
   //#results > div:nth-child(1)
@@ -926,6 +935,7 @@ function LinksScripe(page, index) {
   return a;
 }
 
+//используется для сбора short(раздел )информации
 async function get_info_for_get_info(page, str) {
   //метод $$eval выполняет код на стороне браузера
   //в inf сохраняем информацию которую взяли с одной страницы
@@ -945,6 +955,66 @@ async function get_info_for_get_info(page, str) {
   return inf;
 }
 
+//используется для сбора полной(раздел) информации
+async function get_info_for_get_infoFull(page, str, str2) {
+  //метод $$eval выполняет код на стороне браузера
+  //в inf сохраняем информацию которую взяли с одной страницы
+
+  const inf = page.$$eval(
+    "#page_info_wrap",
+    (postPreviews, str, str2) =>
+      postPreviews.map(postPreview => ({
+        info: postPreview
+          .querySelector(
+            //#profile_full > div:nth-child(2) > div.profile_info > div:nth-child(1) > div.label.fl_l
+            // /#profile_full > div:nth-child(2) > div.profile_info > div:nth-child(2) > div.label.fl_l
+            "#profile_full > div:nth-child(" +
+              str +
+              ") > div.profile_info > div:nth-child(" +
+              str2 +
+              ") > div.label.fl_l"
+          )
+          .textContent.trim()
+      })),
+    str,
+    str2
+  );
+  return inf;
+}
+
+//сбор данных о том отсутствует информация
+async function get_info_for_get_infoFullNotFound(page, str, str2) {
+  //метод $$eval выполняет код на стороне браузера
+  //в inf сохраняем информацию которую взяли с одной страницы
+  //#profile_full > div:nth-child(2) > div.profile_info > div > div.labeled
+  ////#profile_full > div:nth-child(2) > div.profile_info_header_wrap > span
+  const inf = page.$$eval(
+    "#page_info_wrap",
+    (postPreviews, str, str2) =>
+      postPreviews.map(postPreview => ({
+        info: postPreview
+          .querySelector(
+            "#profile_full > div:nth-child(" +
+              str +
+              ") > div.profile_info > div > div.labeled"
+          )
+          .textContent.trim(),
+        stat: postPreview
+          .querySelector(
+            "#profile_full > div:nth-child(" +
+              str2 +
+              ") > div.profile_info_header_wrap > span"
+          )
+          .textContent.trim()
+        //#page_info_wrap
+      })),
+    str,
+    str2
+  );
+  return inf;
+}
+
+//сбор информации из раздела short
 async function get_info_from_page(page, str) {
   //метод $$eval выполняет код на стороне браузера
   //в inf сохраняем информацию которую взяли с одной страницы
@@ -964,6 +1034,33 @@ async function get_info_from_page(page, str) {
   return inf;
 }
 
+//сбор инфы  из полной информации
+async function get_info_from_pageFull(page, str, str2) {
+  //метод $$eval выполняет код на стороне браузера
+  //в inf сохраняем информацию которую взяли с одной страницы
+
+  //#profile_full > div:nth-child(2) > div.profile_info > div:nth-child(1) > div.labeled > a
+
+  const inf = page.$$eval(
+    "#page_info_wrap",
+    (postPreviews, str, str2) =>
+      postPreviews.map(postPreview => ({
+        info: postPreview
+          .querySelector(
+            "#profile_full > div:nth-child(" +
+              str +
+              ") > div.profile_info > div:nth-child(" +
+              str2 +
+              ") > div.labeled > a"
+          )
+          .textContent.trim()
+      })),
+    str,
+    str2
+  );
+  return inf;
+}
+
 //вернет human по ссылке
 async function vk_info_page(page, href) {
   //вернет human
@@ -971,6 +1068,7 @@ async function vk_info_page(page, href) {
   const atribute1 = "День рождения:";
   const atribute2 = "Город:";
   const atribute3 = "Место учёбы:";
+  const atribute4 = "Информация отсутствует.";
   await page.goto(href);
   let count = 0;
   count = await page.$eval("#profile_short", elem => elem.childElementCount);
@@ -991,6 +1089,83 @@ async function vk_info_page(page, href) {
       }
       if (infoBlock[0].info == atribute3) {
         HumanList.University = infoPage[0].info;
+      }
+      //#page_info_wrap > div.page_top > h2
+    }
+    //сбор имени
+    const inf = await page.$$eval("#page_info_wrap", postPreviews =>
+      postPreviews.map(postPreview => ({
+        info: postPreview
+          .querySelector("#page_info_wrap > div.page_top > h2")
+          .textContent.trim()
+      }))
+    );
+    HumanList.name = inf[0].info;
+  }
+
+  let count2 = await page.$eval(
+    "#profile_full",
+    elem => elem.childElementCount
+  );
+  if (count2 == 0) {
+  } else {
+    for (let i = 1; i < count2; i++) {
+      //#profile_full > div:nth-child(1)
+      let fullInf = await get_info_for_get_infoFullNotFound(page, i, i);
+      if (atribute4 == fullInf[0].info && "Образование" == fullInf[0].stat) {
+        console.log("Attetion Info on Study not found");
+      } else if ("Образование" == fullInf[0].stat) {
+        //#profile_full > div:nth-child(2) > div.profile_info
+        let count3 = await page.$eval(
+          "#profile_full > div:nth-child(" + i + ") > div.profile_info",
+          elem => elem.childElementCount
+        );
+        for (let j = 1; j < count3 + 1; j++) {
+          const infoBlock2 = await get_info_for_get_infoFull(page, i, j);
+          const statInBlock = await get_info_from_pageFull(page, i, j);
+          if ("Вуз:" == infoBlock2[0].info && j < 6) {
+            HumanList.University = statInBlock[0].info;
+          }
+          if ("Факультет:" == infoBlock2[0].info && j < 6) {
+            HumanList.University_faculty = statInBlock[0].info;
+          }
+          if ("Кафедра/направление:" == infoBlock2[0].info && j < 6) {
+            //можно добавить инфу Human-a с этой информацией
+          }
+          if ("Форма обучения:" == infoBlock2[0].info && j < 6) {
+            //можно добавить инфу Human-a с этой информацией
+          }
+          if ("Статус:" == infoBlock2[0].info && j < 6) {
+            HumanList.University_graduation = statInBlock[0].info;
+          }
+          if ("Школа:" == infoBlock2[0].info && j < 10) {
+            HumanList.school = statInBlock[0].info;
+          }
+        }
+      }
+      if (
+        "Информация отсутствует." == fullInf[0].info &&
+        "Карьера" == fullInf[0].stat
+      ) {
+        console.log("Attetion Info Карьера  not found");
+      } else if ("Карьера" == fullInf[0].stat) {
+        //можно добавить
+      }
+      if (
+        "Информация отсутствует." == fullInf[0].info &&
+        "Личная информация" == fullInf[0].stat
+      ) {
+        console.log("Attetion Info Личная информация  not found");
+      } else if ("Личная информация" == fullInf[0].stat) {
+        //можно добавить
+      }
+      if (
+        "Информация отсутствует." == fullInf[0].info &&
+        "Военная служба" == fullInf[0].stat
+      ) {
+        console.log("Attetion Info Военная служба  not found");
+      } else if ("Военная служба" == fullInf[0].stat) {
+        //можно добавить
       }
     }
   }
@@ -1039,6 +1214,7 @@ async function VK_Find(login, password, human, with_img, page) {
   //
   //const browser = await puppeteer.launch({ headless: false });//новый браузер
   let page1 = page; //новая страница
+
   let navigation_promise = page1.waitForNavigation({ timeout: 0 }); //ждалка навигации
   await page1.goto("https://vk.com/", { timeout: 0 }).catch(e => {
     throw e;
@@ -1057,6 +1233,11 @@ async function VK_Find(login, password, human, with_img, page) {
   await navigation_promise; //ждем завершения навигации (если кнопка нас не отправила - ждем вечно =) )
   //переход-поиск
   navigation_promise = page1.waitForNavigation({ timeout: 0 });
+  await page1.setRequestInterception(true);
+  page1.on("request", request => {
+    if (request.resourceType() === "image") request.abort();
+    else request.continue();
+  });
   await page1.click("#l_fr"); //друзья
   await navigation_promise;
   await page1.click("#ui_rmenu_find"); //поиск
@@ -1215,4 +1396,4 @@ setTimeout(() => {
   program_flag_test = false;
 }, 120000);
 console.log("Hello world2");
-//waitFor(100000);
+//waitFor(100000)
