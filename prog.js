@@ -11,22 +11,23 @@ const puppeteer = require('puppeteer'); //пупетин
 //файл
 var fs = require('fs'); //файловая система/читалка/писалка в файл
 
-//классы
 
+
+//классы
 class Human {
     constructor() { //это джаваскрипт, детка! свойства/переменные для лохов! конструктор пацанам!
-        this.name = null;
+        this.name = 'zero';
         this.gender = 'all'; // male/all/female
         this.age = -1;
-        this.school = null;
-        this.school_class = null;
-        this.school_graduation = null;
-        this.University = null;
-        this.University_faculty = null;
-        this.University_graduation = null;
+        this.school = 'zero';
+        this.school_class = 'zero';
+        this.school_graduation = 'zero';
+        this.University = 'zero';
+        this.University_faculty = 'zero';
+        this.University_graduation = 'zero';
         this.country = 'Россия';
-        this.region = null;
-        this.img = null;
+        this.region = 'zero';
+        this.img = 'zero';
         //флаги
         this.photo = false;
         this.on_website = false;
@@ -155,10 +156,18 @@ class Meneger { //менеджер, BD - система s1, все id начин
 
 class Human_base { //человеко-шаблон
     constructor() {
-        this.human = new Human();
         this.id = -1;
-        this.humans_ids=null;
+        this.ids = [-1,-2];
     };
+    create(data){
+        if(data != null){
+        this.id = data.id;
+        this.humans_ids = data.humans_ids;
+        }
+    }
+    toString(){
+        console.log('Human_base.tostring:\'',JSON.stringify(this),'\'\n');
+    }
 }
 
 class Task { //задача
@@ -176,14 +185,52 @@ class Task { //задача
 }
 
 class Data_base { //BD
-    constructor() {
-
+    constructor(humanPathinp,human_basePathinp) {
+        this.humanPath = humanPathinp;
+        this.human_basePath = human_basePathinp;
     };
     new_BD() {
 
     };
 
+    load_human_base(id) {//поиск человека в файле по ид, если найден передается как обьект
+        var human_basePath = 'KPO/human_bases.json';
+        var fs = require('fs');
+        function readLines(input, func) {//построчное считывание, 1 строка = 1 человек
+            var remaining = '';        
+            input.on('data', function(data) {
+            remaining += data;
+            var index = remaining.indexOf('\n');
+            var last  = 0;
+            while (index > -1) {
+                var line = remaining.substring(last, index);
+                last = index + 1;
+                func(line);
+                index = remaining.indexOf('\n', last);
+            }        
+            remaining = remaining.substring(last);
+            });        
+            input.on('end', function() {
+            if (remaining.length > 0) {
+                func(remaining);
+            }
+            });
+        }
+        function func(data) {//фунцкия обрабатывает 1 строку
+            var parsedText = JSON.parse(data);
+            if(parsedText.id == id){
+                console.log('human found');
+                return parsedText;
+            }
+        }
+        var input = fs.createReadStream(human_basePath);
+        readLines(input, func);
+        console.log('human is not found');//не понятна очередность выполнения строк кода, это пишется когда нейден человек
+        return null;
+        
+    }
     load_human(id) {//поиск человека в файле по ид, если найден передается как обьект
+        var humanPath = 'KPO/humans.json';
         var fs = require('fs');
         function readLines(input, func) {//построчное считывание, 1 строка = 1 человек
             var remaining = '';        
@@ -215,7 +262,7 @@ class Data_base { //BD
                 return human_0;
             }
         }
-        var input = fs.createReadStream('KPO/foo3.json');
+        var input = fs.createReadStream(humanPath);
         readLines(input, func);
         console.log('human is not found');//не понятна очередность выполнения строк кода, это пишется когда нейден человек
         return null;
@@ -232,17 +279,18 @@ class Data_base { //BD
     }
 
     add_human(human) {
+        var humanPath = 'KPO/humans.json';
         var fs = require('fs');
-        fs.appendFile('KPO/foo3.json', '', function (err) {//создает файл если его нет
+        fs.appendFile(humanPath, '', function (err) {//создает файл если его нет
         if (err) throw err;
         });
-        fs.open('KPO/foo3.json', 'wx', (err,fd) => {
+        fs.open(humanPath, 'wx', (err,fd) => {
             if (err) {
               if (err.code === 'EEXIST') {
                 console.error('human added');
                 let fd2
                 try {
-                    fd2 = fs.openSync('KPO/foo3.json', 'a');
+                    fd2 = fs.openSync(humanPath, 'a');
                     fs.appendFileSync(fd2, '\n'+JSON.stringify(human), 'utf8');
                   } catch (err) {
                     /* Handle the error */
@@ -256,6 +304,33 @@ class Data_base { //BD
               throw err;
             }
           });
+        }
+    add_human_base(human_base) {
+            var human_basePath = 'KPO/human_bases.json';
+            var fs = require('fs');
+            fs.appendFile(human_basePath, '', function (err) {//создает файл если его нет
+            if (err) throw err;
+            });
+            fs.open(human_basePath, 'wx', (err,fd) => {
+                if (err) {
+                  if (err.code === 'EEXIST') {
+                    console.error('human_base added');
+                    let fd2
+                    try {
+                        fd2 = fs.openSync(human_basePath, 'a');
+                        fs.appendFileSync(fd2, '\n'+JSON.stringify(human_base), 'utf8');
+                      } catch (err) {
+                        /* Handle the error */
+                      } finally {
+                        if (fd2 !== undefined)
+                          fs.closeSync(fd2);
+                      }
+                    return;
+                  }
+              
+                  throw err;
+                }
+            });
         }
 }
 
@@ -545,10 +620,269 @@ setTimeout(() => { console.log('Time!'); }, 10000)
 console.log('Hello world2');*/
 
 }
+/*
+Speed
+NeDB is not intended to be a replacement of large-scale databases such as MongoDB, 
+and as such was not designed for speed. That said, it is still pretty fast on the expected datasets, especially if you use indexing. On a typical, not-so-fast dev machine, for a collection containing 10,000 documents, with indexing:
 
-var h = new Human();
-h.init('123',54,'gym','MIET')//инициализация человека
-var BD = new Data_base();
-//BD.add_human(new Human);
-//BD.add_human(h); // проверка записи в файл эти 2 строки не работают одновременно из-за проблем с очередностью выполнения кода
-h = BD.load_human(4); //проверка поиска человека эти 2 строки не работают одновременно из-за проблем с очередностью выполнения кода
+Insert: 10,680 ops/s
+Find: 43,290 ops/s
+Update: 8,000 ops/s
+Remove: 11,750 ops/s
+You can run these simple benchmarks by executing the scripts in the benchmarks folder. 
+Run them with the --help flag to see how they work.
+*/
+//обещанная скорость
+//функции бд
+//
+const Datastore = require('nedb')
+ //переменные для тестов и работы функций(все из тех что ты просил сделать(начинаются с 733))
+var humans = new Datastore({ filename: 'humans.db', autoload: true });  
+var human_base = new Datastore({ filename: 'human_base.db', autoload: true });  
+var tasks = new Datastore({ filename: 'tasks.db', autoload: true });
+//переменные для тестов (650-733)
+var id_for_delete = {_id : 0} //id для удаления обьекта задавать именно так,чтобы работал поиск
+var id_for_search = {_id : 0} //id для поиска обьекта
+var human_base_constr = {id: 0, ids: []};
+
+//запись человека
+{
+    var h = new Human();
+    humans.insert(h, function(err, doc) {  
+        if (err) console.log('1)error in creating: ',err)
+        else  {
+            console.log('1)Inserted', doc.name, 'with ID', id_for_delete._id = doc._id);
+        }//поле
+        //id в клессе human не нужно, эта библиотека сама создает _id
+        //в esle можно записать в любую переменную doc._id
+    });
+}
+//2) удалить человекобазу по id
+{
+        humans.remove(id_for_delete, function(err,numDeleted){
+        if (err) console.log('2)error in deliting: ',err);
+        else  {
+            console.log('2)Deleted', numDeleted, 'human(s)');
+            console.log('id_for_delete ',id_for_delete);
+        }
+        });
+}
+//2) найти (вернуть) человека по id
+{
+    var h = new Human();
+    h.init('name','age','school','university')
+    humans.insert(h, function(err, doc) {  
+        if (err) console.log('2)error in creating: ',err);
+        else  {
+            human_base_constr.id = doc._id;
+            console.log('2)Inserted', doc.name, 'with ID', id_for_search._id = doc._id);
+            id_for_search = doc._id;//делаем новую запись в бд
+        }//поле
+        //id в клессе human не нужно, эта библиотека сама создает _id
+        //в esle можно записать в любую переменную doc._id
+    });
+    
+    console.log("search 1 el");
+    humans.findOne(id_for_search, function(err,doc){//поиск 1 человека
+        if (err) console.log('error in se: ',err)
+        else if (doc == null) console.log('nothing founded ')
+        else  {
+            console.log('varible before search: ')
+            founded_human.toString();
+            founded_human.create(doc)
+            console.log('varible after search: ')
+            founded_human.toString();//в эту переменную записался результат поиска
+            console.log('Found user:', doc.name);
+        }
+    });
+    var founded_human = new Human()//хранит найденного человека
+    var founded_humans = []
+    console.log("search multiple elements");
+    humans.find({name: {$in: ["null","name"]}}, function(err,docs){//поиск нескольких человек
+        if (err) console.log('error in se: ',err)
+        else if (docs == null) console.log('nothing founded ')
+        else  {
+            docs.forEach(d => {
+                /*console.log('varible before multiplesearch: ')
+                founded_human.toString();
+                founded_human.create(d)
+                console.log('varible after multiplesearch: ')
+                founded_human.toString();//в эту переменную записался результат поиска
+                console.log('Found user:', d.name);
+                founded_humans.push(founded_human)*/
+                //работает, но закоменчено, чтобы не было спама
+            });
+            
+        }
+    });
+}
+//3)найти human_base по id человека, вернуть id связанных людей
+{
+    var hb = new Human_base()
+    human_base.insert(hb, function(err, doc) {  
+        if (err) console.log('4)error in creating: ',err)
+        else  {
+            console.log('4)Inserted', doc.id, 'with ID', doc._id);
+            console.log('чертова ява, про последовательность выполнения команд',
+            ' вообще не знает, до этой строки с последовательностью не было проблем',
+            'как дальше будет - хз');
+        }//поле
+        //id в классе human-base  нужно, в нем будет храниться _id humanа
+        //в esle можно записать в любую переменную doc._id но тут это не особо нуджно
+    });
+}
+
+//в виде функций
+function addHuman(human){//1)
+    humans.insert(human, function(err, doc) {  
+        if (err) console.log('1)error in creating: ',err);
+        else  {
+            return doc._id;
+        }
+    });
+}
+function addHumanBase(humanBase){
+    human_base.insert(humanBase, function(err, doc) {  
+        if (err) console.log('1)error in creating: ',err);
+        else  {
+            return doc._id;//возвращает id записи, а не человека
+        }
+    });
+}
+function delHuman(human_id){//2)
+    id = {_id: human_id}
+    humans.remove(id, function(err,numDeleted){
+        if (err) return false;
+        else  
+            if (numDeleted > 0) return true;//если удалена хотябы 1 запись
+            else return false;
+        });
+}
+function delHumanBase(human_id){//удаляет по id человека а не записи в базе
+    id = {id: human_id}
+    human_base.remove(id, function(err,numDeleted){
+        if (err) return false;
+        else  
+            if (numDeleted > 0) return true;//если удалена хотябы 1 запись
+            else return false;
+        });
+}
+function findOneHuman(human_id){//3)
+    id = {_id: human_id}
+    humans.findOne(id, function(err,doc){//поиск 1 человека
+        if (err) return false;
+        else if (doc == null) return false;
+        else  {            
+            var founded_human = new Human();
+            founded_human.create(doc);
+            return founded_human;
+        }
+    });
+}
+function findOneHumanBase(human_id){//3)
+    id = {id: human_id}
+    human_base.findOne(id, function(err,doc){//поиск 1 человека
+        if (err) return false;
+        else if (doc == null) return false;
+        else  {            
+            var founded_human_base = new Human_base();
+            founded_human_base.create(doc);
+            return founded_human_base;
+        }
+    });
+}
+//4)
+function updateHuman(human_id, new_human){//изменение данных человека с помощью id
+    humans.update(findOneHuman(human_id),new_human,function(err,numUpdated){
+        if (err) return false;
+        else if (numUpdated > 0) return true;
+        else  return false;
+    });
+}
+function updateHumanBase(human_id, new_human_base){//изменение данных в humanbase с помощью id
+    human_base.update(findOneHumanBase(human_id),new_human_base,function(err,numUpdated){
+        if (err) return false;
+        else if (numUpdated > 0) return true;
+        else  return false;
+    });
+}
+//5)
+function findHumans(search_task){//example {name: {$in: ["null","name"]}
+
+    console.log("search multiple elements");
+    humans.find({name: {$in: ["null","name"]}}/*вместо этой записи search_task*/, function(err,docs){//поиск нескольких человек
+        if (err) console.log('error in se: ',err)
+        else if (docs == null) console.log('nothing founded ')
+        else  {
+            var founded_human = new Human();//хранит найденного человека
+            var founded_humans = [];
+            docs.forEach(d => {
+                founded_human.create(d)
+                founded_humans.push(founded_human)            
+            });    
+            return founded_humans;   
+        }
+    });
+}
+//6)
+function findHumanBase(human_base_el){
+    id = {id: human_base_el.id}
+    human_base.findOne(id, function(err,doc){//поиск 1 человека
+        if (err) return false;
+        else if (doc == null) return false;
+        else  {            
+            return doc._id;//возвращает id записи в humanbase (не человека)
+        }
+    });
+}
+//7) я так понял подается id человека для изменения, и ids который нужно добавить в поле ids
+function addHumanToBase(human_id,ids_for_adding){
+    id = {id: human_id};
+    var human_base_el_upd = findOneHumanBase(human_id);
+    ids_for_adding.forEach(ids => {
+        human_base_el_upd.ids.push(ids);
+    });
+    human_base.update(findOneHumanBase(human_id),human_base_el_upd,function(err,numUpdated){
+        if (err) return false;
+        else if (numUpdated > 0) return true;
+        else  return false;
+    });
+}
+//8)
+function getConnectedHumans(human_id){//должна работать как с 1 id так и с их массивом
+    var founded_humans = [];
+    var founded_human_base = [];
+    var id = {id: human_id};
+    founded_human_base.push(findHumanBase(id));
+    founded_human_base.forEach(founded_human_base_el => {
+        founded_human_base_el.ids.forEach(human_id_from_hb =>{
+            founded_humans.push(findOneHuman(human_id_from_hb));
+        });
+    });
+    return founded_humans;
+}
+//9)
+function delHumanBase(human_id){//удаляет по id человека а не записи в базе
+    id = {id: human_id}
+    human_base.remove(id, function(err,numDeleted){
+        if (err) return false;
+        else  
+            if (numDeleted > 0) return true;//если удалена хотябы 1 запись
+            else return false;
+        });
+}//когда обьект удаляется на его месте остается {"$$deleted":true,"_id":"mf9KOEszZC0hQNM9"}
+// так что мы всегда сможем понять, что обьект существовал, но был удален
+//10)
+function addTask(task){//1)
+    tasks.insert(task, function(err, doc) {  
+        if (err) console.log('1)error in creating: ',err);
+        else  {
+            return task._id;
+        }
+    });
+} 
+{
+    addTask(new Task());
+}
+//для корректной работы нужно создать файлы humans.db, human_base.db, tasks.db
+//эти файлы должны находиться в открытом фолдере(папке выбранной через Open Folder...)
