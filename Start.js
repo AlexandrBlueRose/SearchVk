@@ -345,7 +345,10 @@ class Data_base {
 }
 
 //функции
-
+export function Hello() {
+  const a = 0;
+  alert(0);
+}
 //для записи и чтения в файл пометки
 //fs.writeFileSync("hello.txt", "Привет ми ми ми!") и асинхронная fs.writeFile("hello.txt", "Привет МИГ-29!") перезапись файла
 //fs.appendFileSync("hello.txt", "Привет ми ми ми!"); и асинхрон fs.appendFile для дозаписи
