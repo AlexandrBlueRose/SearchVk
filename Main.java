@@ -51,17 +51,14 @@ public class Main {
                 
             }
         }
-        //private static boolean logged = false;//login check
-        private static String login = "admin";
-        private static String Password = "admin";
         public static Viewer viewer;
         public static void main(String[] args) throws Exception {
     		// TODO Auto-generated method stub
-        	//GMailSender sender = new GMailSender("consoleLogHelloWorld02@gmail.com", "Fantihon00");
-            //sender.sendMail("Attention",
-                    //"System attention! Your memory is crammed!",
-                    //"consoleLogHelloWorld02@gmail.com",
-                    //"7105581@mail.ru");
+        	GMailSender sender = new GMailSender("consoleLogHelloWorld02@gmail.com", "Fantihon00");
+            sender.sendMail("Attention",
+                    "System attention! Your memory is crammed!",
+                    "consoleLogHelloWorld02@gmail.com",
+                    "7105581@mail.ru");
     		//InputStream inputStream0 = new FileInputStream("logging.properties");
     		//LogManager.getLogManager().readConfiguration(inputStream0);
     		//inputStream0.close();
@@ -274,12 +271,12 @@ public class Main {
                 break;
             }
             if((stat>3000)||(infEm>inf2)){
-                //GMailSender sender = new GMailSender("consoleLogHelloWorld02@gmail.com", "Fantihon00");
-                //sender.sendMail("Attention",
-                        //"System attention! Your memory is crammed!",
-                        //"consoleLogHelloWorld02@gmail.com",
-                        //"7105581@mail.ru");
-                //}
+                GMailSender sender = new GMailSender("consoleLogHelloWorld02@gmail.com", "Fantihon00");
+                sender.sendMail("Attention",
+                        "System attention! Your memory is crammed!",
+                        "consoleLogHelloWorld02@gmail.com",
+                        "7105581@mail.ru");
+                }
             int sum=0;
             //цикл прохода алгоритма взаимодействия воды и карты
             for(int i=0;i<5;i++)
@@ -357,7 +354,7 @@ stopTimerCreate2=System.nanoTime();
            //frame.setTitle("DrawTest");
            //frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
           // frame.setVisible(true);
-           System.out.print("");}
+           System.out.print("");
     }
         public static int AutoTest() throws InterruptedException{
             //цикл который проходит несколько раз создание и обработку карты
@@ -503,12 +500,6 @@ stopTimerCreate2=System.nanoTime();
         	for(int i = 0; i < repeats; i++)
         		eng.run();
         	viewer.view(eng, shortView,viewer.getMode(),viewer.getLevel());
-        	System.out.println("water calculation algorithm launched " + repeats + " times");
-        	
-        }
-        public static boolean tryLogin(String logininp, String passwordinp) {    	
-        		viewer.showMenu(logininp.equals(login) && passwordinp.equals(Password));
-        		return logininp.equals(login) && passwordinp.equals(Password);
         	
         }
 }
